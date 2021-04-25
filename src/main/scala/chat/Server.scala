@@ -26,7 +26,10 @@ object Server {
       val incomingMessages: Sink[Message, NotUsed] =
         Flow[Message].map {
           case TextMessage.Strict(text) => User.IncomingMessage(text)
-        } to Sink.actorRef[User.IncomingMessage](userActor, PoisonPill) // textMessage가 들어오면 IncommingMessage로 변환해서 userActor로 쏴준다.
+        } to Sink.actorRef[User.IncomingMessage](
+          userActor, // textMessage가 들어오면 IncommingMessage로 변환해서 userActor로 쏴준다.
+          PoisonPill // webSocket connection이 끊어지면 stream을 끊는다.?
+        )
 
       val outgoingMessages: Source[Message, NotUsed] =
         Source.actorRef[OutgoingMessage](10, OverflowStrategy.fail)

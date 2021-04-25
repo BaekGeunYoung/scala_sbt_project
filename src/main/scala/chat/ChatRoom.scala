@@ -14,13 +14,16 @@ class ChatRoom extends Actor {
   def receive = {
     case Join =>
       users += sender()
+      broadCast(ChatMessage(s"${sender()} joined chat room"))
       // we also would like to remove the user when its actor is stopped
       context.watch(sender())
 
     case Terminated(user) =>
       users -= user
+      broadCast(ChatMessage(s"$user left chat room"))
 
-    case msg: ChatMessage =>
-      users.foreach(_ ! msg)
+    case msg: ChatMessage => broadCast(msg)
   }
+
+  def broadCast(msg: ChatMessage): Unit = users.foreach(_ ! msg)
 }
