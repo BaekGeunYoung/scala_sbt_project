@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
 import akka.stream._
 import akka.stream.scaladsl._
+import chat.User.OutgoingMessage
 
 import scala.io.StdIn
 
@@ -19,26 +20,26 @@ object Server {
     val chatRoom = system.actorOf(Props(new ChatRoom), "chat")
 
     def newUser(): Flow[Message, Message, NotUsed] = {
-      // new connection - new user actor
+      // 새로운 webSocket connection이 생길 때마다 user가 새로 접속한 것으로 간주하고, userActor를 새로 만들어준다.
       val userActor = system.actorOf(Props(new User(chatRoom)))
 
       val incomingMessages: Sink[Message, NotUsed] =
         Flow[Message].map {
-          // transform websocket message to domain message
           case TextMessage.Strict(text) => User.IncomingMessage(text)
-        }.to(Sink.actorRef[User.IncomingMessage](userActor, PoisonPill))
+        } to Sink.actorRef[User.IncomingMessage](userActor, PoisonPill) // textMessage가 들어오면 IncommingMessage로 변환해서 userActor로 쏴준다.
 
       val outgoingMessages: Source[Message, NotUsed] =
-        Source.actorRef[User.OutgoingMessage](10, OverflowStrategy.fail)
-          .mapMaterializedValue { outActor =>
-            // give the user actor a way to send messages out
-            userActor ! User.Connected(outActor)
-            NotUsed
-          }.map(
-          // transform domain message to web socket message
-          (outMsg: User.OutgoingMessage) => TextMessage(outMsg.text))
+        Source.actorRef[OutgoingMessage](10, OverflowStrategy.fail)
+          .mapMaterializedValue { outActor /* 이 outActor에다가 message를 쏘면 이 source stream으로 message가 들어온다 */ =>
+            userActor ! User.Connected(outActor) // connected 상태가 되면, user actor는 chatRoom actor로부터 ChatMessage를 받아서 outActor로 OutgoingMessage를 쏜다
+            NotUsed // outActor를 user actor와 연결시켜주고, outActor는 더이상 사용하지 않을 것이므로 materializedValue를 notUsed로 바꿔줘도 무방하다
+          } // Source[OutgoingMessage, NotUsed]
+          .map { outMsg =>
+            // user actor로부터 OutgoingMessage를 받아서 webSocket 응답으로 뱉어줄 textMessage를 만들어준다
+            TextMessage(s"returned message : ${outMsg.text}")
+          } // Source[OutgoingMessage, NotUsed]
 
-      // then combine both to a flow
+      // sink와 source를 하나의 flow로 합쳐준다. 여기서 incoming과 outgoing은 연결되어있지 않음. 즉 2개는 독립적으로 작동하며 incoming이 없어도 outgoing이 발생할 수 있음
       Flow.fromSinkAndSource(incomingMessages, outgoingMessages)
     }
 
