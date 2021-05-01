@@ -5,7 +5,6 @@ import akka.actor._
 import akka.http.scaladsl._
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
-import akka.serialization.SerializationExtension
 import akka.stream._
 import akka.stream.scaladsl._
 import chat.User.OutgoingMessage
@@ -19,8 +18,6 @@ object Server {
     implicit val system = ActorSystem()
     implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher
-
-    val serialization = SerializationExtension(system)
 
     def newUser(chatId: Int, userName: String): Flow[Message, Message, NotUsed] = {
 

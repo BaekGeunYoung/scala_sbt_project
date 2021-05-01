@@ -15,16 +15,20 @@ class ChatRoom extends Actor {
     case Join(userName) =>
       users += userName -> sender()
       broadCast(ChatMessage(s"$userName joined chat room", "admin"))
+      println(s"$userName joined chat room")
       // we also would like to remove the user when its actor is stopped
       context.watch(sender())
 
     case Terminated(user) =>
       val terminatedUser = users.filter { mapEntry => mapEntry._2 == user }.head
       users -= terminatedUser._1
+      println(s"${terminatedUser._1} left chat room")
 
       broadCast(ChatMessage(s"${terminatedUser._1} left chat room", "admin"))
 
-    case msg: ChatMessage => broadCast(msg)
+    case msg: ChatMessage =>
+      println(s"message: $msg")
+      broadCast(msg)
   }
 
   def broadCast(msg: ChatMessage): Unit = users.values.foreach(_ ! msg)
