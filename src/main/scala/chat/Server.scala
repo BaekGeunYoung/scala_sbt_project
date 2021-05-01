@@ -5,9 +5,12 @@ import akka.actor._
 import akka.http.scaladsl._
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Directives._
+import akka.serialization.SerializationExtension
 import akka.stream._
 import akka.stream.scaladsl._
 import chat.User.OutgoingMessage
+import JsonProtocol._
+import spray.json._
 
 import scala.io.StdIn
 
@@ -16,6 +19,8 @@ object Server {
     implicit val system = ActorSystem()
     implicit val materializer = ActorMaterializer()
     implicit val ec = system.dispatcher
+
+    val serialization = SerializationExtension(system)
 
     def newUser(chatId: Int, userName: String): Flow[Message, Message, NotUsed] = {
 
@@ -40,7 +45,7 @@ object Server {
           } // Source[OutgoingMessage, NotUsed]
           .map { outMsg =>
             // user actor로부터 OutgoingMessage를 받아서 webSocket 응답으로 뱉어줄 textMessage를 만들어준다
-            TextMessage(s"${outMsg.author}: ${outMsg.text}")
+            TextMessage(outMsg.toJson.toString())
           } // Source[TextMessage, NotUsed]
 
       // sink와 source를 하나의 flow로 합쳐준다. 여기서 incoming과 outgoing은 연결되어있지 않음. 즉 2개는 독립적으로 작동하며 incoming이 없어도 outgoing이 발생할 수 있음
